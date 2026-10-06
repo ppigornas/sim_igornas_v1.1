@@ -1,14 +1,93 @@
 import { publicApi, appApi, authApi } from "./api.js";
 import { getUser, login, logout, clearAuth } from "./auth.js";
-import { $, $$, escapeHtml, formatDate, formatNumber, loading, emptyState, errorState, modal, table, statCard, roleLabel, statusBadge, toast, bindModalClose } from "./ui.js";
+import {
+  $,
+  $$,
+  escapeHtml,
+  formatDate,
+  formatNumber,
+  loading,
+  emptyState,
+  errorState,
+  modal,
+  table,
+  statCard,
+  statusBadge,
+  toast,
+  bindModalClose
+} from "./ui.js";
+
+/*
+ * ============================================================
+ * ROLE SYSTEM
+ * ============================================================
+ * Database menggunakan:
+ * ADMIN
+ * PUSAT
+ * PROVINSI
+ * KOTA_KAB
+ * ANGGOTA
+ *
+ * Kode lama frontend seperti:
+ * PENGURUS_PUSAT
+ * PENGURUS_PROVINSI
+ * PENGURUS_KOTA_KABUPATEN
+ *
+ * tetap dikenali agar bagian lain aplikasi tidak rusak.
+ */
+
+function normalizeRole(value) {
+  const role = String(value || "").trim().toUpperCase();
+
+  const aliases = {
+    ADMIN: "ADMIN",
+
+    PUSAT: "PUSAT",
+    PENGURUS_PUSAT: "PUSAT",
+
+    PROVINSI: "PROVINSI",
+    PENGURUS_PROVINSI: "PROVINSI",
+
+    KOTA_KAB: "KOTA_KAB",
+    PENGURUS_KOTA_KABUPATEN: "KOTA_KAB",
+
+    ANGGOTA: "ANGGOTA"
+  };
+
+  return aliases[role] || role;
+}
 
 function role() {
-  return getUser()?.role || "";
+  return normalizeRole(getUser()?.role || "");
 }
 
 function roleCan(...roles) {
-  return roles.includes(role());
+  const currentRole = role();
+
+  return roles
+    .map(normalizeRole)
+    .includes(currentRole);
 }
+
+function roleLabel(value) {
+  const normalized = normalizeRole(value);
+
+  const labels = {
+    ADMIN: "Admin",
+    PUSAT: "Pengurus Pusat",
+    PROVINSI: "Pengurus Provinsi",
+    KOTA_KAB: "Pengurus Kota/Kabupaten",
+    ANGGOTA: "Anggota"
+  };
+
+  return labels[normalized] || value || "-";
+}
+
+/*
+ * ============================================================
+ * DASHBOARD SHELL
+ * ============================================================
+ */
 
 function shell(title, subtitle, content) {
   return `
@@ -16,52 +95,235 @@ function shell(title, subtitle, content) {
       <aside class="sidebar">
         <div class="brand-mini">
           <div class="brand-mark">◎</div>
-          <div><strong>SIO</strong><small>Organisasi V1.1</small></div>
+          <div>
+            <strong>SIO</strong>
+            <small>Organisasi V1.1</small>
+          </div>
         </div>
+
         <nav class="side-nav" id="side-nav">
           ${menuForRole()}
         </nav>
-        <button class="side-logout" id="btn-side-logout">↪ Keluar</button>
+
+        <button class="side-logout" id="btn-side-logout">
+          ↪ Keluar
+        </button>
       </aside>
+
       <main class="dashboard-main">
         <header class="topbar">
           <div>
-            <div class="eyebrow">Sistem Informasi Organisasi</div>
+            <div class="eyebrow">
+              Sistem Informasi Organisasi
+            </div>
+
             <h1>${escapeHtml(title)}</h1>
+
             <p>${escapeHtml(subtitle || "")}</p>
           </div>
+
           <div class="user-chip">
-            <div class="avatar">${escapeHtml((getUser()?.NAMA_LENGKAP || getUser()?.USERNAME || "A").slice(0,1).toUpperCase())}</div>
-            <div><strong>${escapeHtml(getUser()?.NAMA_LENGKAP || getUser()?.USERNAME || "Pengguna")}</strong><small>${escapeHtml(roleLabel(role()))}</small></div>
+            <div class="avatar">
+              ${escapeHtml(
+                (
+                  getUser()?.NAMA_LENGKAP ||
+                  getUser()?.USERNAME ||
+                  "A"
+                )
+                  .slice(0, 1)
+                  .toUpperCase()
+              )}
+            </div>
+
+            <div>
+              <strong>
+                ${escapeHtml(
+                  getUser()?.NAMA_LENGKAP ||
+                  getUser()?.USERNAME ||
+                  "Pengguna"
+                )}
+              </strong>
+
+              <small>
+                ${escapeHtml(roleLabel(role()))}
+              </small>
+            </div>
           </div>
         </header>
-        <section class="page-content">${content}</section>
+
+        <section class="page-content">
+          ${content}
+        </section>
       </main>
-    </div>`;
+    </div>
+  `;
 }
+
+/*
+ * ============================================================
+ * MENU BERDASARKAN ROLE
+ * ============================================================
+ */
 
 function menuForRole() {
   const items = [
-    ["dashboard", "⌂", "Dashboard", true],
+    ["dashboard", "⌂", "Dashboard", true]
   ];
-  if (roleCan("ADMIN", "PENGURUS_PUSAT", "PENGURUS_PROVINSI", "PENGURUS_KOTA_KABUPATEN", "ANGGOTA")) {
-    items.push(["members", "♙", "Anggota", true]);
+
+  /*
+   * ANGGOTA
+   * Semua role dapat melihat modul Anggota.
+   */
+  if (
+    roleCan(
+      "ADMIN",
+      "PUSAT",
+      "PROVINSI",
+      "KOTA_KAB",
+      "ANGGOTA"
+    )
+  ) {
+    items.push([
+      "members",
+      "♙",
+      "Anggota",
+      true
+    ]);
   }
-  if (roleCan("ADMIN", "PENGURUS_PUSAT", "PENGURUS_PROVINSI", "PENGURUS_KOTA_KABUPATEN")) {
-    items.push(["pengurus", "♟", "Pengurus", true]);
-    items.push(["pengajuan", "✉", "Pengajuan", true]);
-    items.push(["surat", "▤", "Administrasi Surat", true]);
+
+  /*
+   * PENGURUS
+   */
+  if (
+    roleCan(
+      "ADMIN",
+      "PUSAT",
+      "PROVINSI",
+      "KOTA_KAB"
+    )
+  ) {
+    items.push([
+      "pengurus",
+      "♟",
+      "Pengurus",
+      true
+    ]);
+
+    items.push([
+      "pengajuan",
+      "✉",
+      "Pengajuan",
+      true
+    ]);
+
+    items.push([
+      "surat",
+      "▤",
+      "Administrasi Surat",
+      true
+    ]);
   }
-  if (roleCan("ADMIN", "PENGURUS_PUSAT")) items.push(["users", "♙", "Manajemen Akun", true]);
-  if (roleCan("ADMIN", "PENGURUS_PUSAT", "PENGURUS_PROVINSI", "PENGURUS_KOTA_KABUPATEN")) items.push(["website", "◈", "Publikasi", true]);
-  if (roleCan("ADMIN", "PENGURUS_PUSAT", "PENGURUS_PROVINSI", "PENGURUS_KOTA_KABUPATEN")) items.push(["reports", "▥", "Laporan", true]);
+
+  /*
+   * MANAJEMEN AKUN
+   * Hanya Admin dan Pengurus Pusat.
+   */
+  if (
+    roleCan(
+      "ADMIN",
+      "PUSAT"
+    )
+  ) {
+    items.push([
+      "users",
+      "♙",
+      "Manajemen Akun",
+      true
+    ]);
+  }
+
+  /*
+   * PUBLIKASI
+   */
+  if (
+    roleCan(
+      "ADMIN",
+      "PUSAT",
+      "PROVINSI",
+      "KOTA_KAB"
+    )
+  ) {
+    items.push([
+      "website",
+      "◈",
+      "Publikasi",
+      true
+    ]);
+  }
+
+  /*
+   * LAPORAN
+   */
+  if (
+    roleCan(
+      "ADMIN",
+      "PUSAT",
+      "PROVINSI",
+      "KOTA_KAB"
+    )
+  ) {
+    items.push([
+      "reports",
+      "▥",
+      "Laporan",
+      true
+    ]);
+  }
+
+  /*
+   * KHUSUS ADMIN
+   */
   if (roleCan("ADMIN")) {
-    items.push(["logs", "≡", "Audit Log", true]);
-    items.push(["settings", "⚙", "Pengaturan", true]);
-    items.push(["backup", "◫", "Backup", true]);
+    items.push([
+      "logs",
+      "≡",
+      "Audit Log",
+      true
+    ]);
+
+    items.push([
+      "settings",
+      "⚙",
+      "Pengaturan",
+      true
+    ]);
+
+    items.push([
+      "backup",
+      "◫",
+      "Backup",
+      true
+    ]);
   }
-  items.push(["profile", "●", "Profil Saya", true]);
-  return items.map(([id, icon, label]) => `<a class="nav-item" href="#/app/${id}" data-nav="${id}"><span>${icon}</span>${label}</a>`).join("");
+
+  /*
+   * SEMUA ROLE
+   */
+  items.push([
+    "profile",
+    "●",
+    "Profil Saya",
+    true
+  ]);
+
+  return items
+    .map(
+      ([id, icon, label]) =>
+        `<a class="nav-item" href="#/app/${id}" data-nav="${id}">
+          <span>${icon}</span>${label}
+        </a>`
+    )
+    .join("");
 }
 
 export async function renderPublicHome() {
