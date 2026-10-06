@@ -175,24 +175,48 @@ function bindPasswordToggle() {
 
 async function handleLogin(e) {
   e.preventDefault();
+
   const form = e.currentTarget;
   const button = form.querySelector("button[type=submit]");
-  button.disabled = true; button.textContent = "Memeriksa...";
+
+  button.disabled = true;
+  button.textContent = "Memeriksa...";
+
   try {
-    const data = await login(form.username.value.trim(), form.password.value);
+    const data = await login(
+      form.username.value.trim(),
+      form.password.value
+    );
+
+    // Refresh session agar role dari backend tersedia
+    // sebelum navigasi dashboard dibuat.
+    const session = await authApi.session();
+
+    sessionStorage.setItem(
+      "org_user",
+      JSON.stringify({
+        ...session.user,
+        role: session.role
+      })
+    );
+
     toast("Login berhasil.", "success");
+
     if (data.forceChangePassword) {
       location.hash = "#/app/profile?forcePassword=1";
     } else {
       location.hash = "#/app/dashboard";
     }
+
   } catch (err) {
-    $("#login-message").innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+    $("#login-message").innerHTML =
+      `<div class="form-error">${escapeHtml(err.message)}</div>`;
+
   } finally {
-    button.disabled = false; button.textContent = "Masuk";
+    button.disabled = false;
+    button.textContent = "Masuk";
   }
 }
-
 export async function renderRegister() {
   const root = $("#app");
   root.innerHTML = `
